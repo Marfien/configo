@@ -49,6 +49,40 @@ identifiers. A change to the tag format, the source list or the supported field
 types needs an update in `doc.go` *and* in the README, which cover the same
 ground for different audiences.
 
+## Releasing
+
+For maintainers. A release *is* a git tag — there is no artifact to build and
+nothing to upload. Pushing a `v*` tag runs
+[`.github/workflows/release.yml`](./.github/workflows/release.yml), which
+validates the tag, re-runs the full suite against it, creates the GitHub release
+from the matching `CHANGELOG.md` section, and primes the module proxy so
+pkg.go.dev picks up the docs within minutes rather than on its next poll.
+
+```shell
+# 1. Turn "## [Unreleased]" into "## [0.1.0] - YYYY-MM-DD" and commit
+git commit -am "chore: release v0.1.0"
+git push origin main
+
+# 2. Tag and push; the workflow does the rest
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
+
+Two things to know before you push a tag:
+
+- **A published version is immutable.** `proxy.golang.org` caches a tag's
+  content permanently on first fetch, so moving or deleting a tag does not take
+  effect — anyone who already fetched keeps the old bytes, and anyone who has not
+  gets a checksum mismatch. A bad release is fixed by publishing the next patch
+  version, never by retagging.
+- **`v2` and above need a module path suffix.** `go.mod` must declare
+  `module github.com/Marfien/configo/v2`. The workflow refuses a mismatched tag
+  before anything fetches it, which is the only point where the mistake is still
+  cheap. Staying on `0.x` while the tag format and merge semantics are unsettled
+  avoids the question entirely.
+
+Tags of the form `v1.2.3-rc.1` are marked as prereleases automatically.
+
 ## Layout
 
 | File               | Contents                                                         |

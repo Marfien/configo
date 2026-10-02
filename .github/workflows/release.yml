@@ -1,0 +1,230 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify tag
+    runs-on: ubuntu-latest
+    outputs:
+      module: ${{ steps.version.outputs.module }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      # A published tag is permanently cached by the module proxy, so the
+      # cheapest place to catch a bad release is before anything fetches it.
+      - name: Validate tag against module path
+        id: version
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          module="$(go list -m)"
+
+          if ! printf '%s' "$version" |
+            grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+(\.[0-9A-Za-z.]+)*)?$'; then
+            echo "::error::Tag '$version' is not a valid Go module version. Use vX.Y.Z or vX.Y.Z-pre."
+            exit 1
+          fi
+
+          major="$(printf '%s' "$version" | sed -E 's/^v([0-9]+)\..*/\1/')"
+          if [ "$major" -ge 2 ]; then
+            case "$module" in
+              */v"$major") ;;
+              *)
+                echo "::error::Releasing $version requires the module path to end in /v$major, but go.mod declares '$module'."
+                exit 1
+                ;;
+            esac
+          else
+            case "$module" in
+              */v[0-9]*)
+                echo "::error::Module path '$module' carries a major version suffix, so it cannot be released as $version."
+                exit 1
+                ;;
+            esac
+          fi
+
+          prerelease=false
+          case "$version" in
+            *-*) prerelease=true ;;
+          esac
+
+          {
+            echo "module=$module"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing $module@$version (prerelease: $prerelease)"
+
+      # Releasing off a branch that never landed is almost always a mistake, but
+      # a patch release from a maintenance branch is legitimate — so warn only.
+      - name: Check the tag is on main
+        continue-on-error: true
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "Tagged commit is on main."
+          else
+            echo "::warning::$GITHUB_REF_NAME points at a commit that is not on main."
+          fi
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt'ed:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Verify go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  release:
+    name: Create GitHub release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Everything between this version's "## [x.y.z]" heading and the next
+          # heading, minus the trailing link-reference block, with surrounding
+          # blank lines trimmed.
+          awk -v ver="${VERSION#v}" '
+            $0 ~ "^## \\[" ver "\\]" { inside = 1; next }
+            inside && /^## / { exit }
+            inside && /^\[[^]]+\]:[[:space:]]/ { exit }
+            inside { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac > notes.md
+
+          if [ -s notes.md ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No '## [${VERSION#v}]' section in CHANGELOG.md; falling back to generated notes."
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          NOTES_FOUND: ${{ steps.notes.outputs.found }}
+        run: |
+          set -euo pipefail
+          args=(release create "$VERSION" --title "$VERSION" --verify-tag)
+
+          if [ "$NOTES_FOUND" = "true" ]; then
+            args+=(--notes-file notes.md)
+          else
+            args+=(--generate-notes)
+          fi
+
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"
+
+  publish:
+    name: Publish to module proxy
+    needs: [verify, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      # proxy.golang.org caches a module version permanently on first request,
+      # so asking for it here means pkg.go.dev has the docs within minutes
+      # instead of whenever it next polls. The proxy needs a moment to see a
+      # freshly pushed tag, hence the retries.
+      - name: Warm the module proxy and checksum database
+        env:
+          MODULE: ${{ needs.verify.outputs.module }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          GOPROXY: https://proxy.golang.org,direct
+          GOSUMDB: sum.golang.org
+          GOFLAGS: -mod=mod
+        run: |
+          set -euo pipefail
+          # A throwaway module keeps the request independent of this checkout.
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+          go mod init proxywarm >/dev/null
+
+          for attempt in 1 2 3 4 5 6; do
+            if go get "${MODULE}@${VERSION}"; then
+              echo "Proxy served ${MODULE}@${VERSION}."
+              break
+            fi
+            if [ "$attempt" = 6 ]; then
+              echo "::error::Proxy did not serve ${MODULE}@${VERSION} after $attempt attempts."
+              exit 1
+            fi
+            echo "Attempt $attempt failed; the proxy may not see the tag yet. Retrying in 20s."
+            sleep 20
+          done
+
+          go list -m "${MODULE}@${VERSION}"
+
+      - name: Trigger pkg.go.dev documentation build
+        continue-on-error: true
+        env:
+          MODULE: ${{ needs.verify.outputs.module }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: curl -fsSL -o /dev/null "https://pkg.go.dev/${MODULE}@${VERSION}"
+
+      - name: Summary
+        env:
+          MODULE: ${{ needs.verify.outputs.module }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          {
+            echo "### Released \`${MODULE}@${VERSION}\`"
+            echo
+            echo "- [Release notes](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${VERSION})"
+            echo "- [pkg.go.dev](https://pkg.go.dev/${MODULE}@${VERSION})"
+            echo
+            echo '```shell'
+            echo "go get ${MODULE}@${VERSION}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -15,6 +15,9 @@ are easy to find.
 
 - `LICENSE` (MIT), `CONTRIBUTING.md` and package documentation in `doc.go`.
 - GitHub Actions CI running `gofmt`, `go mod tidy`, `go vet` and `go test -race`.
+- A release workflow triggered by pushing a `v*` tag: it validates the tag
+  against the module path, re-runs the suite, publishes the GitHub release from
+  this file, and warms the module proxy for pkg.go.dev.
 - Issue and pull request templates, and Dependabot updates for Go modules and
   GitHub Actions.
 
