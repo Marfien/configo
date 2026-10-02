@@ -72,9 +72,20 @@ func (e explorer) exploreWithParents(s any, parents map[string][]string) ([]expl
 		}
 
 		nestedParents := make(map[string][]string)
-		for k, v := range sourceKeys {
+		for tag, v := range sourceKeys {
 			// TODO: handle missing entries in parents
-			nestedParents[k] = append(parents[k], v)
+			if parentsKeys, ok := parents[tag]; ok {
+				nestedParents[tag] = append(parentsKeys, v)
+			} else {
+				nestedParents[tag] = []string{v}
+			}
+		}
+
+		// add empty entries for those sources that are not present at this field, but may be deeper
+		for tag, v := range parents {
+			if _, ok := sourceKeys[tag]; !ok {
+				nestedParents[tag] = append(v, "")
+			}
 		}
 
 		nestedFields, err := e.exploreWithParents(fieldV.Addr().Interface(), nestedParents)

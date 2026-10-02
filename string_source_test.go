@@ -7,14 +7,11 @@ import (
 )
 
 // newTestStringSource serves every key from a flat map, ignoring parents.
-func newTestStringSource(values map[string]string) stringSource {
-	return stringSource{
-		tag: "string",
-		lookupString: func(key string, parents []string) (string, bool) {
-			val, ok := values[key]
-			return val, ok
-		},
-	}
+func newTestStringSource(values map[string]string) StringSource {
+	return NewStringSource("string", func(key string, parents []string) (string, bool) {
+		val, ok := values[key]
+		return val, ok
+	})
 }
 
 func TestStringSource_Tag(t *testing.T) {
@@ -25,14 +22,11 @@ func TestStringSource_lookup(t *testing.T) {
 	var gotKey string
 	var gotParents []string
 
-	s := stringSource{
-		tag: "string",
-		lookupString: func(key string, parents []string) (string, bool) {
-			gotKey = key
-			gotParents = parents
-			return "value", true
-		},
-	}
+	s := NewStringSource("string", func(key string, parents []string) (string, bool) {
+		gotKey = key
+		gotParents = parents
+		return "value", true
+	})
 
 	got, gotErr := s.GetString("key", []string{"parent1", "parent2"})
 

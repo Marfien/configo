@@ -6,16 +6,33 @@ import (
 	"strings"
 )
 
-type stringSource struct {
+// LookupFunc resolves a key to its raw string representation. The second return
+// value reports whether the key was present at all; a found-but-empty value is
+// ("", true). StringSource turns a false into ErrNotFoundInSource so the Parser
+// falls through to the next source.
+type LookupFunc func(key string, parents []string) (string, bool)
+
+// StringSource adapts a string based backend to the Source interface. It handles
+// all conversions itself: scalars via the strconv package, slices by splitting on
+// commas, and maps by additionally splitting each entry on the first "=".
+type StringSource struct {
 	tag          string
-	lookupString func(key string, parents []string) (string, bool)
+	lookupString LookupFunc
 }
 
-func (s stringSource) Tag() string {
+// NewStringSource builds a Source that answers every lookup through lookup.
+func NewStringSource(tag string, lookup LookupFunc) StringSource {
+	return StringSource{
+		tag:          tag,
+		lookupString: lookup,
+	}
+}
+
+func (s StringSource) Tag() string {
 	return s.tag
 }
 
-func (s stringSource) GetString(key string, parents []string) (string, error) {
+func (s StringSource) GetString(key string, parents []string) (string, error) {
 	val, ok := s.lookupString(key, parents)
 	if ok {
 		return val, nil
@@ -24,7 +41,7 @@ func (s stringSource) GetString(key string, parents []string) (string, error) {
 	}
 }
 
-func (s stringSource) GetBool(key string, parents []string) (bool, error) {
+func (s StringSource) GetBool(key string, parents []string) (bool, error) {
 	sVal, err := s.GetString(key, parents)
 	if err != nil {
 		return false, err
@@ -33,7 +50,7 @@ func (s stringSource) GetBool(key string, parents []string) (bool, error) {
 	return val, err
 }
 
-func (s stringSource) GetInt(key string, parents []string) (int, error) {
+func (s StringSource) GetInt(key string, parents []string) (int, error) {
 	sVal, err := s.GetString(key, parents)
 	if err != nil {
 		return 0, err
@@ -42,7 +59,7 @@ func (s stringSource) GetInt(key string, parents []string) (int, error) {
 	return val, err
 }
 
-func (s stringSource) GetUint(key string, parents []string) (uint, error) {
+func (s StringSource) GetUint(key string, parents []string) (uint, error) {
 	sVal, err := s.GetString(key, parents)
 	if err != nil {
 		return 0, err
@@ -51,7 +68,7 @@ func (s stringSource) GetUint(key string, parents []string) (uint, error) {
 	return uint(v), err
 }
 
-func (s stringSource) GetFloat(key string, parents []string) (float64, error) {
+func (s StringSource) GetFloat(key string, parents []string) (float64, error) {
 	sVal, err := s.GetString(key, parents)
 	if err != nil {
 		return 0, err
@@ -60,7 +77,7 @@ func (s stringSource) GetFloat(key string, parents []string) (float64, error) {
 	return v, err
 }
 
-func (s stringSource) GetStringSlice(key string, parents []string) ([]string, error) {
+func (s StringSource) GetStringSlice(key string, parents []string) ([]string, error) {
 	sVal, err := s.GetString(key, parents)
 	if err != nil {
 		return nil, err
@@ -69,7 +86,7 @@ func (s stringSource) GetStringSlice(key string, parents []string) ([]string, er
 	return strings.Split(sVal, ","), nil
 }
 
-func (s stringSource) GetBoolSlice(key string, parents []string) ([]bool, error) {
+func (s StringSource) GetBoolSlice(key string, parents []string) ([]bool, error) {
 	raw, err := s.GetStringSlice(key, parents)
 	if err != nil {
 		return nil, err
@@ -86,7 +103,7 @@ func (s stringSource) GetBoolSlice(key string, parents []string) ([]bool, error)
 	return res, nil
 }
 
-func (s stringSource) GetIntSlice(key string, parents []string) ([]int, error) {
+func (s StringSource) GetIntSlice(key string, parents []string) ([]int, error) {
 	raw, err := s.GetStringSlice(key, parents)
 	if err != nil {
 		return nil, err
@@ -103,7 +120,7 @@ func (s stringSource) GetIntSlice(key string, parents []string) ([]int, error) {
 	return res, nil
 }
 
-func (s stringSource) GetUintSlice(key string, parents []string) ([]uint, error) {
+func (s StringSource) GetUintSlice(key string, parents []string) ([]uint, error) {
 	raw, err := s.GetStringSlice(key, parents)
 	if err != nil {
 		return nil, err
@@ -120,7 +137,7 @@ func (s stringSource) GetUintSlice(key string, parents []string) ([]uint, error)
 	return res, nil
 }
 
-func (s stringSource) GetFloatSlice(key string, parents []string) ([]float64, error) {
+func (s StringSource) GetFloatSlice(key string, parents []string) ([]float64, error) {
 	raw, err := s.GetStringSlice(key, parents)
 	if err != nil {
 		return nil, err
@@ -137,7 +154,7 @@ func (s stringSource) GetFloatSlice(key string, parents []string) ([]float64, er
 	return res, nil
 }
 
-func (s stringSource) GetStringMap(key string, parents []string) (map[string]string, error) {
+func (s StringSource) GetStringMap(key string, parents []string) (map[string]string, error) {
 	raw, err := s.GetStringSlice(key, parents)
 	if err != nil {
 		return nil, err
@@ -155,7 +172,7 @@ func (s stringSource) GetStringMap(key string, parents []string) (map[string]str
 	return res, nil
 }
 
-func (s stringSource) GetBoolMap(key string, parents []string) (map[string]bool, error) {
+func (s StringSource) GetBoolMap(key string, parents []string) (map[string]bool, error) {
 	sMap, err := s.GetStringMap(key, parents)
 	if err != nil {
 		return nil, err
@@ -173,7 +190,7 @@ func (s stringSource) GetBoolMap(key string, parents []string) (map[string]bool,
 	return res, nil
 }
 
-func (s stringSource) GetIntMap(key string, parents []string) (map[string]int, error) {
+func (s StringSource) GetIntMap(key string, parents []string) (map[string]int, error) {
 	sMap, err := s.GetStringMap(key, parents)
 	if err != nil {
 		return nil, err
@@ -191,7 +208,7 @@ func (s stringSource) GetIntMap(key string, parents []string) (map[string]int, e
 	return res, nil
 }
 
-func (s stringSource) GetUintMap(key string, parents []string) (map[string]uint, error) {
+func (s StringSource) GetUintMap(key string, parents []string) (map[string]uint, error) {
 	sMap, err := s.GetStringMap(key, parents)
 	if err != nil {
 		return nil, err
@@ -209,7 +226,7 @@ func (s stringSource) GetUintMap(key string, parents []string) (map[string]uint,
 	return res, nil
 }
 
-func (s stringSource) GetFloatMap(key string, parents []string) (map[string]float64, error) {
+func (s StringSource) GetFloatMap(key string, parents []string) (map[string]float64, error) {
 	sMap, err := s.GetStringMap(key, parents)
 	if err != nil {
 		return nil, err

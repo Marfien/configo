@@ -12,13 +12,10 @@ var (
 
 func NewCliSource(tag string, args []string) Source {
 	namedArgs := parseArgs(args)
-	return stringSource{
-		tag: tag,
-		lookupString: func(key string, parents []string) (string, bool) {
-			val, ok := namedArgs[key]
-			return val, ok
-		},
-	}
+	return NewStringSource(tag, func(key string, parents []string) (string, bool) {
+		val, ok := namedArgs[key]
+		return val, ok
+	})
 }
 
 func parseArgs(args []string) map[string]string {

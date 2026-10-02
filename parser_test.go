@@ -216,12 +216,9 @@ func Test_getterForType(t *testing.T) {
 }
 
 func TestParser_Parse(t *testing.T) {
-	parentsSource := stringSource{
-		tag: "parents",
-		lookupString: func(key string, parents []string) (string, bool) {
-			return strings.Join(append(parents, key), "."), true
-		},
-	}
+	parentsSource := NewStringSource("parents", func(key string, parents []string) (string, bool) {
+		return strings.Join(append(parents, key), "."), true
+	})
 
 	tests := []struct {
 		name        string
