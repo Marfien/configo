@@ -173,6 +173,13 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
+      - name: Trigger pkg.go.dev documentation build
+        continue-on-error: true
+        env:
+          MODULE: ${{ needs.verify.outputs.module }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: curl -fsSL -o /dev/null "https://pkg.go.dev/${MODULE}@${VERSION}"
+
       # proxy.golang.org caches a module version permanently on first request,
       # so asking for it here means pkg.go.dev has the docs within minutes
       # instead of whenever it next polls. The proxy needs a moment to see a
@@ -205,13 +212,6 @@ jobs:
           done
 
           go list -m "${MODULE}@${VERSION}"
-
-      - name: Trigger pkg.go.dev documentation build
-        continue-on-error: true
-        env:
-          MODULE: ${{ needs.verify.outputs.module }}
-          VERSION: ${{ needs.verify.outputs.version }}
-        run: curl -fsSL -o /dev/null "https://pkg.go.dev/${MODULE}@${VERSION}"
 
       - name: Summary
         env:
