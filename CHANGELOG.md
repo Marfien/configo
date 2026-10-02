@@ -9,7 +9,7 @@ While configo is at `0.x`, the public API and the `configo` tag format may chang
 in any release. Breaking changes are called out under their own heading so they
 are easy to find.
 
-## v0.1.0 - 2026-10-02
+## 0.1.0 - 2026-10-02
 
 ### Added
 
