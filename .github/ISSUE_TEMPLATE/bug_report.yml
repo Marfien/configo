@@ -1,0 +1,98 @@
+name: Bug report
+description: configo resolves a field to the wrong value, or fails on a config it should accept
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The three things that explain almost every configo
+        bug are the **struct tag**, the **source order** and the **input values** —
+        please fill those in even if the problem looks obvious.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did configo do, and what did you expect instead?
+      placeholder: |
+        Port stayed at 0 even though APP_PORT was set.
+        I expected 9090.
+    validations:
+      required: true
+
+  - type: textarea
+    id: config-struct
+    attributes:
+      label: Config struct
+      description: The struct you pass to `Parse`, including the `configo` tags.
+      render: go
+      placeholder: |
+        type Config struct {
+            Host string `configo:"env=APP_HOST,default=localhost"`
+            Port int    `configo:"env=APP_PORT"`
+        }
+    validations:
+      required: true
+
+  - type: textarea
+    id: parser
+    attributes:
+      label: Parser setup
+      description: >
+        How you build the parser, in source order. If you use the package level
+        `configo.Parse`, say so — it is `Default` then `Environment`.
+      render: go
+      placeholder: |
+        parser := configo.NewParser(
+            configo.WithSources(configo.Default, configo.Environment),
+        )
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: Input values
+      description: >
+        The environment variables, CLI arguments or map entries in play. Redact
+        secrets, but keep the shape (quoting, commas, empty values) intact —
+        those details are usually the bug.
+      render: shell
+      placeholder: APP_PORT=9090 APP_HOSTS=a,b,c ./myapp --host example.com
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error or output
+      description: The error returned by `Parse`, or the resolved struct you got.
+      render: text
+      placeholder: 'missing values: Port'
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      description: Output of `go version`.
+      placeholder: go version go1.26.7 linux/amd64
+    validations:
+      required: true
+
+  - type: input
+    id: configo-version
+    attributes:
+      label: configo version
+      description: The version from your `go.mod`, or the commit SHA if you track `main`.
+      placeholder: v0.1.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: custom-source
+    attributes:
+      label: Custom sources
+      description: >
+        If a source you wrote yourself is involved, paste it or its `Tag()` and
+        the relevant getter. Leave blank if you only use the built-in sources.
+      render: go

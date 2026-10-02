@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/Marfien/configo/discussions
+    about: >
+      Not sure how to map a field, order your sources or write a custom source?
+      Ask in Discussions rather than opening an issue.
+  - name: Package documentation
+    url: https://pkg.go.dev/github.com/Marfien/configo
+    about: API reference for every exported type and function.

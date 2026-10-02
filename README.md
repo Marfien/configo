@@ -1,5 +1,10 @@
 # configo — Configuration with Go
 
+[![CI](https://github.com/Marfien/configo/actions/workflows/ci.yml/badge.svg)](https://github.com/Marfien/configo/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Marfien/configo.svg)](https://pkg.go.dev/github.com/Marfien/configo)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Marfien/configo)](https://goreportcard.com/report/github.com/Marfien/configo)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 configo supplies you with a tag driven configuration framework.
 
 ## Abstract
@@ -203,51 +208,11 @@ parser := configo.NewParser(
 ## How to contribute
 
 Contributions are welcome — the roadmap above is a good place to look for
-something to pick up.
+something to pick up. [CONTRIBUTING.md](./CONTRIBUTING.md) covers the setup, the
+expectations for a change, the shape of the test suite and the file layout.
 
-### Getting set up
+Notable changes are recorded in [CHANGELOG.md](./CHANGELOG.md).
 
-```shell
-git clone https://github.com/Marfien/configo.git
-cd configo
-go test ./...
-```
+## License
 
-Go 1.26 or newer is required (the code uses `range` over integers and
-`strings.SplitSeq`). The only dependency is
-[testify](https://github.com/stretchr/testify), used for assertions in tests.
-
-### Working on a change
-
-- Open an issue first for anything that changes the public API or the tag
-  format, so the design can be agreed on before you write code.
-- Keep commits focused and write a short, imperative subject line.
-- Run `go test ./...`, `go vet ./...` and `gofmt -l .` before pushing; `gofmt`
-  should print nothing.
-
-### Tests
-
-The suite is table driven throughout — follow the existing shape rather than
-introducing a new style:
-
-- Config structs used by parser cases live in `parser_fixtures_test.go`, not
-  inline in the test function.
-- Each case is a struct in a `tests` slice with a `name`, run via
-  `t.Run(tt.name, ...)`.
-- Assertions use `github.com/stretchr/testify/assert`.
-
-New behaviour needs a test. A new source needs coverage of the "not found" path
-(`ErrNotFoundInSource`) as well as the happy path, since `Parse` relies on that
-sentinel to fall through to the next source.
-
-### Layout
-
-| File               | Contents                                                         |
-| ------------------ | ---------------------------------------------------------------- |
-| `configo.go`       | Package level `Parse`, the `Environment` and `Default` sources   |
-| `types.go`         | The `Source` interface and `ErrNotFoundInSource`                 |
-| `parser.go`        | `Parser`, options, type dispatch and reflection-based assignment |
-| `explorer.go`      | Struct traversal: tag parsing, nesting, parent key paths         |
-| `string_source.go` | Shared string parsing for string-based sources                   |
-| `cli_source.go`    | `NewCliSource` and argument parsing                              |
-| `map_source.go`    | `NewMapSource`                                                   |
+[MIT](./LICENSE) © Marvin Haase

@@ -1,0 +1,82 @@
+name: Feature request
+description: Suggest a new source, field type, tag option or API
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Anything that changes the public API or the tag format should be
+        discussed here before you write code — see
+        [CONTRIBUTING.md](https://github.com/Marfien/configo/blob/main/CONTRIBUTING.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >
+        What configuration do you want to express that configo cannot express
+        today? Describe the situation rather than the solution.
+      placeholder: >
+        I load a YAML file and an env var for the same field and want the
+        non-empty one to win, not simply the later one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: >
+        What would it look like in a struct tag or in the parser setup? A rough
+        sketch is fine.
+      render: go
+      placeholder: |
+        type Config struct {
+            Port int `configo:"env=APP_PORT,required"`
+        }
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of configo does this touch?
+      options:
+        - A new source
+        - An existing built-in source
+        - The configo tag format
+        - Supported field types
+        - Merging / priorities
+        - Validation
+        - Parser API or options
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Is this a breaking change?
+      options:
+        - "No — purely additive"
+        - "Yes — changes existing behaviour or signatures"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        Can you already do this with a custom source or a different source
+        order? If you tried and it did not work, say why.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this
